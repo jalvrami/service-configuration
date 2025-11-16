@@ -1,0 +1,137 @@
+
+server:
+  port: 8080
+
+spring:
+  main:
+    web-application-type: reactive
+  cloud:
+    gateway:
+      routes:
+        - id: auth
+          uri: lb://auth
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=0
+
+        - id: yanki-wallet-service
+          uri: lb://yanki-wallet-service
+          predicates:
+            - Path=/api/yanki/**
+          filters:
+            - AuthenticationFilter
+            - name: CircuitBreaker
+              args:
+                name: yankiWalletCB
+                fallbackUri: forward:/fallback/yanki
+
+        - id: reactive-banking-account
+          #uri: http://localhost:8082
+          uri: lb://reactive-banking-account # 'lb://' para balanceo de carga a través de <<!nav>>service discovery<<!/nav>>
+          predicates:
+            - Path=/api/v1/{segment:accounts|debit-cards}/**
+          filters:
+            - AuthenticationFilter
+            - name: CircuitBreaker
+              args:
+                name: accountServiceCB
+                fallbackUri: forward:/fallback/accounts
+
+        - id: reactive-banking-credit
+          #uri: http://localhost:8083
+          uri: lb://reactive-banking-credit # 'lb://' para balanceo de carga a través de <<!nav>>service discovery<<!/nav>>
+          predicates:
+            - Path=/api/v1/credits/** # Aplica a cualquier ruta que comience con /users/
+          filters:
+            - AuthenticationFilter
+            - name: CircuitBreaker
+              args:
+                name: creditServiceCB
+                fallbackUri: forward:/fallback/credits
+
+        - id: reactive-banking-customer
+          uri: lb://reactive-banking-customer
+          #uri: http://localhost:8081 # 'lb://' para balanceo de carga a través de <<!nav>>service discovery<<!/nav>>
+          predicates:
+            - Path=/api/v1/customers/** # Aplica a cualquier ruta que comience con /users/
+          filters:
+            - AuthenticationFilter
+            - name: CircuitBreaker
+              args:
+                name: customerServiceCB
+                fallbackUri: forward:/fallback/customers
+
+        - id: reactive-banking-transaction
+          uri: lb://reactive-banking-transaction
+          #uri: http://localhost:8084 # 'lb://' para balanceo de carga a través de <<!nav>>service discovery<<!/nav>>
+          predicates:
+            - Path=/api/v1/transactions/** # Aplica a cualquier ruta que comience con /users/
+          filters:
+            - AuthenticationFilter
+            - name: CircuitBreaker
+              args:
+                name: transactionServiceCB
+                fallbackUri: forward:/fallback/transactions
+
+# Configuración de Resilience4j
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED #Tracks calls by count, not time
+        registerHealthIndicator: true # Reports health status to monitoring
+        slidingWindowSize: 10 # Evaluates last 10 calls
+        minimumNumberOfCalls: 5 # Needs 5 calls before checking thresholds
+        permittedNumberOfCallsInHalfOpenState: 3 # Allows 3 test calls in half-open state
+        automaticTransitionFromOpenToHalfOpenEnabled: true # Auto-transitions to half-open after wait time
+        waitDurationInOpenState: 10s # Waits 10 seconds before trying half-open
+        failureRateThreshold: 50 # Opens circuit if 50% of calls fail
+        slowCallRateThreshold: 50 # Opens circuit if 50% of calls are slow
+        slowCallDurationThreshold: 2s # Calls over 2 seconds are considered slow
+
+    instances:
+      customerServiceCB:
+        baseConfig: default
+      accountServiceCB:
+        baseConfig: default
+      creditServiceCB:
+        baseConfig: default
+      transactionServiceCB:
+        baseConfig: default
+      yankiWalletCB:
+        baseConfig: default
+
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 5s
+    instances:
+      customerServiceCB:
+        timeoutDuration: 5s
+      accountServiceCB:
+        timeoutDuration: 5s
+      creditServiceCB:
+        timeoutDuration: 5s
+      transactionServiceCB:
+        timeoutDuration: 5s
+      yankiWalletCB:
+        timeoutDuration: 5s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+
+#sonarpass: Undert@kerRock1
