@@ -1,0 +1,40 @@
+server:
+  port: 8083
+
+spring:
+  main:
+    web-application-type: reactive
+  web:
+    resources:
+      add-mappings: false
+  webflux:
+    problem details:
+      enabled: false
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/credits_db}
+      auto-index-creation: ${MONGODB_AUTO_INDEX_CREATION:true}
+
+logging:
+  level:
+    root: INFO
+    com.credit.reactive_banking_credit: DEBUG
+    com.credit.reactive_banking_credit.infrastructure.controller: INFO
+    com.credit.reactive_banking_credit.infrastructure.repository: DEBUG
+    com.credit.reactive_banking_credit.application.service: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.data.mongodb: DEBUG
+    org.mongodb.driver: INFO
+
+  file:
+    name: logs/reactive-banking-credit.log
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+  logback:
+    rolling policy:
+      max-file-size: 10MB
+      max-history: 30
+      total-size-cap: 1GB
